@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Next Token Prediction: Context Moves Through Multi-Dimensional Space</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8f9fa;
+            color: #1a1a2e;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            grid-template-rows: 60px 1fr;
+            height: 100vh;
+        }
+
+        header {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            background: #fff;
+            border-bottom: 1px solid #e0e0e0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1a1a2e;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+        }
+
+        .control-btn {
+            padding: 8px 16px;
+            background: #fff;
+            border: 1px solid #d0d0d0;
+            color: #333;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .control-btn:hover {
+            background: #f0f0f0;
+            border-color: #8b5cf6;
+        }
+
+        .control-btn.active {
+            background: #8b5cf6;
+            color: #fff;
+            border-color: #8b5cf6;
+        }
+
+        /* Left panel */
+        .explanation-panel {
+            background: #fff;
+            padding: 22px 20px;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #e0e0e0;
+            overflow-y: auto;
+        }
+
+        .concept-box {
+            background: #f3f0ff;
+            border: 1px solid #d4c8f5;
+            border-radius: 8px;
+            padding: 14px;
+            margin-bottom: 16px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .concept-box strong {
+            color: #7c3aed;
+        }
+
+        .sentence-builder {
+            margin-bottom: 18px;
+        }
+
+        .sentence-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #666;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .sentence-display {
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 15px;
+            line-height: 1.8;
+            padding: 12px;
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            min-height: 48px;
+        }
+
+        .sentence-display .token {
+            display: inline-block;
+            padding: 3px 6px;
+            margin: 2px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+
+        .sentence-display .token.processed {
+            background: #e9e4f5;
+            color: #5b3d99;
+        }
+
+        .sentence-display .token.current {
+            background: #8b5cf6;
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .sentence-display .token.predicted {
+            background: #dcfce7;
+            border: 1px dashed #22c55e;
+            color: #166534;
+        }
+
+        .sentence-display .cursor {
+            display: inline-block;
+            width: 2px;
+            height: 18px;
+            background: #8b5cf6;
+            margin-left: 4px;
+            animation: blink 1s infinite;
+            vertical-align: middle;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        /* Dimension pulls display */
+        .dimension-pulls {
+            margin-bottom: 18px;
+        }
+
+        .dimension-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #666;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .dimension-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+
+        .dimension-label {
+            width: 70px;
+            text-align: right;
+            color: #555;
+            font-weight: 500;
+        }
+
+        .dimension-bar-container {
+            flex: 1;
+            height: 14px;
+            background: #e8e8e8;
+            border-radius: 7px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .dimension-bar-center {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #ccc;
+        }
+
+        .dimension-bar {
+            position: absolute;
+            top: 2px;
+            bottom: 2px;
+            border-radius: 5px;
+            transition: all 0.5s ease;
+        }
+
+        .dimension-bar.positive {
+            left: 50%;
+            background: linear-gradient(to right, #8b5cf6, #22c55e);
+        }
+
+        .dimension-bar.negative {
+            right: 50%;
+            background: linear-gradient(to left, #8b5cf6, #ef4444);
+        }
+
+        .dimension-value {
+            width: 45px;
+            font-family: 'SF Mono', monospace;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .dimension-endpoints {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #888;
+            margin-top: 3px;
+            padding: 0 80px 0 0;
+        }
+
+        .prediction-panel {
+            margin-bottom: 18px;
+        }
+
+        .prediction-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #666;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .prediction-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .prediction-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 10px;
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 13px;
+            transition: all 0.3s ease;
+        }
+
+        .prediction-item.chosen {
+            background: #dcfce7;
+            border: 1px solid #86efac;
+        }
+
+        .prediction-word {
+            font-family: 'SF Mono', Monaco, monospace;
+            font-weight: 600;
+            min-width: 75px;
+            color: #333;
+        }
+
+        .prediction-bar-bg {
+            flex: 1;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .prediction-bar {
+            height: 100%;
+            background: #8b5cf6;
+            border-radius: 3px;
+            transition: width 0.4s ease;
+        }
+
+        .prediction-item.chosen .prediction-bar {
+            background: #22c55e;
+        }
+
+        .prediction-pct {
+            font-size: 12px;
+            color: #666;
+            min-width: 35px;
+            text-align: right;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: auto;
+        }
+
+        .nav-btn {
+            flex: 1;
+            padding: 12px 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .nav-btn.prev {
+            background: #f0f0f0;
+            color: #333;
+            border: 1px solid #d0d0d0;
+        }
+
+        .nav-btn.prev:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .nav-btn.next {
+            background: #8b5cf6;
+            color: #fff;
+        }
+
+        .nav-btn.next:hover {
+            background: #7c3aed;
+        }
+
+        /* Main visualization - 3D */
+        .viz-container {
+            position: relative;
+            overflow: hidden;
+            perspective: 1000px;
+            background: linear-gradient(135deg, #f0f4f8 0%, #e8eef5 50%, #f5f7fa 100%);
+        }
+
+        .scene-3d {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transform: rotateX(15deg) rotateY(-20deg);
+            transition: transform 0.3s ease;
+        }
+
+        /* Word points in 3D */
+        .word-point {
+            position: absolute;
+            transform-style: preserve-3d;
+            cursor: pointer;
+            transition: all 0.5s ease;
+        }
+
+        .word-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+
+        .word-text {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 13px;
+            font-weight: 500;
+            white-space: nowrap;
+            color: #333;
+            transition: all 0.3s ease;
+            text-shadow: 0 0 4px rgba(255, 255, 255, 0.9);
+        }
+
+        .word-point:hover .word-dot {
+            transform: scale(1.5);
+        }
+
+        .word-point:hover .word-text {
+            opacity: 1;
+        }
+
+        .word-point.highlight .word-dot {
+            transform: scale(1.8);
+            box-shadow: 0 0 20px currentColor;
+        }
+
+        .word-point.highlight .word-text {
+            opacity: 1;
+            font-weight: 700;
+        }
+
+        .word-point.candidate .word-dot {
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.4); }
+        }
+
+        /* Context vector in 3D */
+        .context-vector {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #8b5cf6;
+            border: 3px solid #fff;
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.6), 0 2px 8px rgba(0,0,0,0.2);
+            transform: translate(-50%, -50%);
+            transition: all 0.6s ease;
+            z-index: 10;
+        }
+
+        .context-label {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%) translateY(-180%);
+            font-size: 12px;
+            font-weight: 600;
+            color: #fff;
+            white-space: nowrap;
+            background: #8b5cf6;
+            padding: 4px 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        }
+
+        /* Trail showing path */
+        .trail-dot {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #a78bfa;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        /* Axis indicators */
+        .axis-label {
+            position: absolute;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+            pointer-events: none;
+        }
+
+        .axis-x-left { left: 8%; top: 50%; color: #16a34a; }
+        .axis-x-right { right: 8%; top: 50%; color: #d97706; }
+        .axis-y-top { top: 15%; left: 50%; transform: translateX(-50%); color: #2563eb; }
+        .axis-y-bottom { bottom: 15%; left: 50%; transform: translateX(-50%); color: #dc2626; }
+        .axis-z-label { bottom: 8%; right: 12%; color: #7c3aed; }
+
+        /* Legend */
+        .legend {
+            position: absolute;
+            bottom: 16px;
+            left: 16px;
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 14px 16px;
+            font-size: 12px;
+            z-index: 20;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .legend-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #666;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 6px;
+            color: #333;
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        /* Sentence selector */
+        .sentence-selector {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 12px 14px;
+            z-index: 20;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .selector-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #666;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .selector-options {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .selector-btn {
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            color: #333;
+            font-size: 12px;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.3s ease;
+        }
+
+        .selector-btn:hover {
+            background: #f0f0f0;
+            border-color: #ccc;
+        }
+
+        .selector-btn.active {
+            background: #f3f0ff;
+            border-color: #8b5cf6;
+            color: #5b3d99;
+        }
+
+        /* Playback controls */
+        .playback-controls {
+            position: absolute;
+            bottom: 16px;
+            right: 16px;
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 20;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .play-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #8b5cf6;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .play-btn:hover {
+            background: #7c3aed;
+            transform: scale(1.1);
+        }
+
+        /* Category colors - stronger for light mode */
+        .cat-nature { color: #16a34a; }
+        .cat-finance { color: #d97706; }
+        .cat-crime { color: #dc2626; }
+        .cat-neutral { color: #7c3aed; }
+        .cat-function { color: #6b7280; }
+
+        @keyframes slowRotate {
+            0% { transform: rotateX(15deg) rotateY(-20deg); }
+            100% { transform: rotateX(15deg) rotateY(340deg); }
+        }
+
+        @media (max-width: 900px) {
+            .container {
+                grid-template-columns: 1fr;
+                grid-template-rows: 60px auto 1fr;
+            }
+
+            .explanation-panel {
+                border-right: none;
+                border-bottom: 1px solid #e0e0e0;
+                max-height: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Next Token: Context Moves Through Multi-Dimensional Space</h1>
+            <div class="controls">
+                <button class="control-btn" id="rotate-btn">Rotate</button>
+                <button class="control-btn" id="reset-view">Reset View</button>
+            </div>
+        </header>
+
+        <aside class="explanation-panel">
+            <div class="concept-box">
+                <strong>Core idea:</strong> Each word is a point in 768-dimensional space. As tokens are added, a new <strong>output vector</strong> is computed. It moves along <strong>many dimensions at once</strong>. The next word is chosen by what's nearest.
+            </div>
+
+            <div class="sentence-builder">
+                <div class="sentence-label">Current sentence</div>
+                <div class="sentence-display" id="sentence-display">
+                    <span class="cursor"></span>
+                </div>
+            </div>
+
+            <div class="dimension-pulls">
+                <div class="dimension-title">Output vector position (3 of 768 dimensions)</div>
+
+                <div class="dimension-row">
+                    <span class="dimension-label">Dim 12:</span>
+                    <div class="dimension-bar-container">
+                        <div class="dimension-bar-center"></div>
+                        <div class="dimension-bar" id="dim-x"></div>
+                    </div>
+                    <span class="dimension-value" id="dim-x-val">0.00</span>
+                </div>
+                <div class="dimension-endpoints">
+                    <span>← nature</span>
+                    <span>institution →</span>
+                </div>
+
+                <div class="dimension-row" style="margin-top: 8px;">
+                    <span class="dimension-label">Dim 47:</span>
+                    <div class="dimension-bar-container">
+                        <div class="dimension-bar-center"></div>
+                        <div class="dimension-bar" id="dim-y"></div>
+                    </div>
+                    <span class="dimension-value" id="dim-y-val">0.00</span>
+                </div>
+                <div class="dimension-endpoints">
+                    <span>← negative</span>
+                    <span>positive →</span>
+                </div>
+
+                <div class="dimension-row" style="margin-top: 8px;">
+                    <span class="dimension-label">Dim 203:</span>
+                    <div class="dimension-bar-container">
+                        <div class="dimension-bar-center"></div>
+                        <div class="dimension-bar" id="dim-z"></div>
+                    </div>
+                    <span class="dimension-value" id="dim-z-val">0.00</span>
+                </div>
+                <div class="dimension-endpoints">
+                    <span>← tangible</span>
+                    <span>conceptual →</span>
+                </div>
+            </div>
+
+            <div class="prediction-panel">
+                <div class="prediction-title">Nearest words (most likely next)</div>
+                <div class="prediction-list" id="predictions"></div>
+            </div>
+
+            <div class="nav-buttons">
+                <button class="nav-btn prev" id="prev-btn" disabled>← Back</button>
+                <button class="nav-btn next" id="next-btn">Add Token →</button>
+            </div>
+        </aside>
+
+        <main class="viz-container" id="viz-container">
+            <div class="scene-3d" id="scene">
+                <!-- 3D word points rendered here -->
+            </div>
+
+            <!-- Axis labels -->
+            <div class="axis-label axis-x-left">← Dim 12 (nature)</div>
+            <div class="axis-label axis-x-right">Dim 12 (institution) →</div>
+            <div class="axis-label axis-y-top">Dim 47 (positive) ↑</div>
+            <div class="axis-label axis-y-bottom">Dim 47 (negative) ↓</div>
+            <div class="axis-label axis-z-label">Depth = Dim 203 (tangible↔conceptual)</div>
+
+            <div class="legend">
+                <div class="legend-title">Word Categories</div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: #16a34a"></div>
+                    <span>Nature</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: #d97706"></div>
+                    <span>Finance</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: #dc2626"></div>
+                    <span>Crime</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: #8b5cf6; border: 2px solid #fff; box-shadow: 0 0 8px rgba(139,92,246,0.5);"></div>
+                    <span>Output vector</span>
+                </div>
+            </div>
+
+            <div class="sentence-selector">
+                <div class="selector-title">Choose sentence</div>
+                <div class="selector-options">
+                    <button class="selector-btn active" data-sentence="nature">"The bank by the river..."</button>
+                    <button class="selector-btn" data-sentence="finance">"The bank approved my..."</button>
+                    <button class="selector-btn" data-sentence="crime">"The bank was robbed..."</button>
+                </div>
+            </div>
+
+            <div class="playback-controls">
+                <button class="play-btn" id="play-btn">▶</button>
+                <button class="control-btn" id="step-back">←</button>
+                <button class="control-btn" id="step-forward">→</button>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // 3D word positions
+        // X: nature (-) to finance (+)
+        // Y: negative (-) to positive (+)
+        // Z: concrete (-) to abstract (+)
+        const WORDS_3D = {
+            // Function words (center, slightly abstract)
+            "the": { x: 0, y: 0, z: 0.1, cat: "function" },
+            "a": { x: 0.02, y: 0, z: 0.1, cat: "function" },
+            "by": { x: -0.05, y: 0, z: 0.15, cat: "function" },
+            "was": { x: 0.03, y: -0.05, z: 0.1, cat: "function" },
+            "my": { x: 0.08, y: 0.1, z: 0.2, cat: "function" },
+            "last": { x: 0.05, y: -0.08, z: 0.05, cat: "function" },
+
+            // Nature words (left, neutral-positive, concrete)
+            "river": { x: -0.7, y: 0.15, z: -0.3, cat: "nature" },
+            "bank": { x: -0.08, y: 0, z: -0.1, cat: "neutral" },
+            "steep": { x: -0.65, y: -0.1, z: -0.35, cat: "nature" },
+            "water": { x: -0.72, y: 0.2, z: -0.25, cat: "nature" },
+            "stream": { x: -0.68, y: 0.18, z: -0.28, cat: "nature" },
+            "shore": { x: -0.6, y: 0.1, z: -0.32, cat: "nature" },
+            "fish": { x: -0.75, y: 0.25, z: -0.2, cat: "nature" },
+
+            // Finance words (right, positive, more abstract)
+            "approved": { x: 0.65, y: 0.45, z: 0.25, cat: "finance" },
+            "loan": { x: 0.7, y: 0.35, z: 0.2, cat: "finance" },
+            "money": { x: 0.6, y: 0.3, z: 0.15, cat: "finance" },
+            "account": { x: 0.72, y: 0.4, z: 0.3, cat: "finance" },
+            "deposit": { x: 0.68, y: 0.32, z: 0.18, cat: "finance" },
+            "savings": { x: 0.58, y: 0.48, z: 0.28, cat: "finance" },
+            "today": { x: 0.15, y: 0.2, z: 0.05, cat: "function" },
+
+            // Crime words (right, negative, concrete)
+            "robbed": { x: 0.7, y: -0.4, z: -0.2, cat: "crime" },
+            "police": { x: 0.65, y: -0.35, z: -0.15, cat: "crime" },
+            "alarm": { x: 0.6, y: -0.3, z: -0.25, cat: "crime" },
+            "theft": { x: 0.72, y: -0.45, z: -0.18, cat: "crime" },
+            "criminal": { x: 0.68, y: -0.38, z: -0.1, cat: "crime" },
+            "night": { x: 0.1, y: -0.2, z: -0.3, cat: "function" },
+        };
+
+        // Sentences with 3D context positions
+        const SENTENCES = {
+            nature: {
+                tokens: ["The", "bank", "by", "the", "river", "was", "steep"],
+                positions: [
+                    { x: 0, y: 0, z: 0.1 },
+                    { x: -0.04, y: 0, z: 0 },
+                    { x: -0.12, y: 0.02, z: 0.05 },
+                    { x: -0.18, y: 0.03, z: 0.02 },
+                    { x: -0.55, y: 0.12, z: -0.22 },
+                    { x: -0.6, y: 0.05, z: -0.25 },
+                    { x: -0.65, y: -0.05, z: -0.32 },
+                ],
+                predictions: [
+                    [["bank", 0.15], ["dog", 0.08], ["man", 0.07], ["river", 0.05], ["car", 0.04]],
+                    [["was", 0.18], ["of", 0.12], ["approved", 0.09], ["by", 0.08], ["robbed", 0.07]],
+                    [["the", 0.25], ["a", 0.15], ["my", 0.08], ["some", 0.05], ["that", 0.04]],
+                    [["river", 0.22], ["bank", 0.10], ["old", 0.08], ["lake", 0.07], ["road", 0.06]],
+                    [["was", 0.30], ["is", 0.15], ["flows", 0.10], ["looked", 0.08], ["ran", 0.05]],
+                    [["steep", 0.18], ["beautiful", 0.12], ["calm", 0.10], ["deep", 0.09], ["cold", 0.08]],
+                    [[".", 0.35], ["and", 0.15], [",", 0.12], ["today", 0.05], ["here", 0.04]],
+                ]
+            },
+            finance: {
+                tokens: ["The", "bank", "approved", "my", "loan", "today"],
+                positions: [
+                    { x: 0, y: 0, z: 0.1 },
+                    { x: -0.04, y: 0, z: 0 },
+                    { x: 0.45, y: 0.35, z: 0.18 },
+                    { x: 0.52, y: 0.38, z: 0.2 },
+                    { x: 0.62, y: 0.36, z: 0.2 },
+                    { x: 0.65, y: 0.4, z: 0.22 },
+                ],
+                predictions: [
+                    [["bank", 0.15], ["dog", 0.08], ["man", 0.07], ["river", 0.05], ["car", 0.04]],
+                    [["was", 0.18], ["of", 0.12], ["approved", 0.09], ["by", 0.08], ["robbed", 0.07]],
+                    [["my", 0.22], ["the", 0.18], ["a", 0.12], ["his", 0.08], ["our", 0.06]],
+                    [["loan", 0.28], ["request", 0.15], ["application", 0.12], ["mortgage", 0.10], ["account", 0.08]],
+                    [["today", 0.20], ["yesterday", 0.15], ["quickly", 0.10], ["finally", 0.08], ["!", 0.07]],
+                    [[".", 0.40], ["!", 0.18], [",", 0.12], ["and", 0.08], ["after", 0.05]],
+                ]
+            },
+            crime: {
+                tokens: ["The", "bank", "was", "robbed", "last", "night"],
+                positions: [
+                    { x: 0, y: 0, z: 0.1 },
+                    { x: -0.04, y: 0, z: 0 },
+                    { x: 0, y: -0.04, z: 0.02 },
+                    { x: 0.5, y: -0.32, z: -0.15 },
+                    { x: 0.55, y: -0.35, z: -0.18 },
+                    { x: 0.6, y: -0.38, z: -0.25 },
+                ],
+                predictions: [
+                    [["bank", 0.15], ["dog", 0.08], ["man", 0.07], ["river", 0.05], ["car", 0.04]],
+                    [["was", 0.18], ["of", 0.12], ["approved", 0.09], ["by", 0.08], ["robbed", 0.07]],
+                    [["robbed", 0.15], ["closed", 0.12], ["open", 0.10], ["built", 0.08], ["busy", 0.07]],
+                    [["last", 0.22], ["yesterday", 0.18], ["this", 0.12], ["early", 0.08], ["at", 0.07]],
+                    [["night", 0.35], ["week", 0.20], ["month", 0.15], ["year", 0.10], ["Tuesday", 0.08]],
+                    [[".", 0.45], ["by", 0.15], [",", 0.12], ["and", 0.08], ["when", 0.05]],
+                ]
+            }
+        };
+
+        const CAT_COLORS = {
+            nature: "#16a34a",
+            finance: "#d97706",
+            crime: "#dc2626",
+            neutral: "#7c3aed",
+            function: "#6b7280"
+        };
+
+        class NextToken3DVisualizer {
+            constructor() {
+                this.container = document.getElementById('viz-container');
+                this.scene = document.getElementById('scene');
+                this.currentSentence = 'nature';
+                this.currentStep = 0;
+                this.isPlaying = false;
+                this.isRotating = false;
+
+                this.centerX = 0;
+                this.centerY = 0;
+                this.scale = 280;
+
+                this.init();
+            }
+
+            init() {
+                this.updateDimensions();
+                this.renderWords();
+                this.renderContextVector();
+                this.setupEventListeners();
+                this.updateDisplay();
+            }
+
+            get sentenceData() {
+                return SENTENCES[this.currentSentence];
+            }
+
+            updateDimensions() {
+                const rect = this.container.getBoundingClientRect();
+                this.centerX = rect.width / 2;
+                this.centerY = rect.height / 2;
+                this.scale = Math.min(rect.width, rect.height) * 0.38;
+            }
+
+            to2D(x, y, z) {
+                const perspective = 600;
+                const zOffset = z * this.scale;
+                const depthScale = perspective / (perspective + zOffset);
+                return {
+                    x: this.centerX + x * this.scale * depthScale,
+                    y: this.centerY - y * this.scale * depthScale,
+                    z: zOffset,
+                    scale: depthScale
+                };
+            }
+
+            renderWords() {
+                this.scene.querySelectorAll('.word-point').forEach(el => el.remove());
+
+                for (const [word, data] of Object.entries(WORDS_3D)) {
+                    const pos = this.to2D(data.x, data.y, data.z);
+
+                    const point = document.createElement('div');
+                    point.className = `word-point cat-${data.cat}`;
+                    point.dataset.word = word;
+                    point.style.left = `${pos.x}px`;
+                    point.style.top = `${pos.y}px`;
+                    point.style.transform = `translateZ(${pos.z}px) scale(${pos.scale})`;
+                    point.style.opacity = 0.4 + pos.scale * 0.4;
+                    point.style.zIndex = Math.round(pos.scale * 100);
+
+                    point.innerHTML = `
+                        <div class="word-dot" style="background: ${CAT_COLORS[data.cat]}; box-shadow: 0 0 8px ${CAT_COLORS[data.cat]}"></div>
+                        <div class="word-text">${word}</div>
+                    `;
+
+                    this.scene.appendChild(point);
+                }
+            }
+
+            renderContextVector() {
+                this.scene.querySelectorAll('.context-vector, .trail-dot').forEach(el => el.remove());
+
+                // Render trail
+                for (let i = 0; i < this.currentStep; i++) {
+                    const trailPos = this.sentenceData.positions[i];
+                    const pos = this.to2D(trailPos.x, trailPos.y, trailPos.z);
+
+                    const trail = document.createElement('div');
+                    trail.className = 'trail-dot';
+                    trail.style.left = `${pos.x}px`;
+                    trail.style.top = `${pos.y}px`;
+                    trail.style.opacity = 0.2 + (i / this.currentStep) * 0.3;
+                    trail.style.transform = `translateZ(${pos.z}px) translate(-50%, -50%)`;
+
+                    this.scene.appendChild(trail);
+                }
+
+                // Render context vector
+                const currentPos = this.sentenceData.positions[this.currentStep];
+                const pos = this.to2D(currentPos.x, currentPos.y, currentPos.z);
+
+                const vector = document.createElement('div');
+                vector.className = 'context-vector';
+                vector.style.left = `${pos.x}px`;
+                vector.style.top = `${pos.y}px`;
+                vector.style.transform = `translateZ(${pos.z}px) translate(-50%, -50%)`;
+
+                const label = document.createElement('div');
+                label.className = 'context-label';
+                label.textContent = 'output';
+                vector.appendChild(label);
+
+                this.scene.appendChild(vector);
+
+                this.highlightNearbyWords();
+                this.updateDimensionBars(currentPos);
+            }
+
+            updateDimensionBars(pos) {
+                // X dimension
+                const xBar = document.getElementById('dim-x');
+                const xVal = document.getElementById('dim-x-val');
+                const xPct = Math.abs(pos.x) * 60;
+                xBar.className = `dimension-bar ${pos.x >= 0 ? 'positive' : 'negative'}`;
+                xBar.style.width = `${xPct}%`;
+                xVal.textContent = pos.x.toFixed(2);
+
+                // Y dimension
+                const yBar = document.getElementById('dim-y');
+                const yVal = document.getElementById('dim-y-val');
+                const yPct = Math.abs(pos.y) * 80;
+                yBar.className = `dimension-bar ${pos.y >= 0 ? 'positive' : 'negative'}`;
+                yBar.style.width = `${yPct}%`;
+                yVal.textContent = pos.y.toFixed(2);
+
+                // Z dimension
+                const zBar = document.getElementById('dim-z');
+                const zVal = document.getElementById('dim-z-val');
+                const zPct = Math.abs(pos.z) * 100;
+                zBar.className = `dimension-bar ${pos.z >= 0 ? 'positive' : 'negative'}`;
+                zBar.style.width = `${zPct}%`;
+                zVal.textContent = pos.z.toFixed(2);
+            }
+
+            highlightNearbyWords() {
+                this.scene.querySelectorAll('.word-point').forEach(el => {
+                    el.classList.remove('highlight', 'candidate');
+                });
+
+                const predictions = this.sentenceData.predictions[this.currentStep];
+                for (let i = 0; i < predictions.length; i++) {
+                    const [word] = predictions[i];
+                    const el = this.scene.querySelector(`.word-point[data-word="${word.toLowerCase()}"]`);
+                    if (el) {
+                        if (i === 0 && this.currentStep < this.sentenceData.tokens.length - 1) {
+                            el.classList.add('highlight');
+                        } else {
+                            el.classList.add('candidate');
+                        }
+                    }
+                }
+            }
+
+            updateDisplay() {
+                // Sentence display
+                const display = document.getElementById('sentence-display');
+                let html = '';
+
+                for (let i = 0; i <= this.currentStep && i < this.sentenceData.tokens.length; i++) {
+                    const isLast = i === this.currentStep;
+                    html += `<span class="token ${isLast ? 'current' : 'processed'}">${this.sentenceData.tokens[i]}</span>`;
+                }
+
+                if (this.currentStep < this.sentenceData.tokens.length - 1) {
+                    const nextToken = this.sentenceData.tokens[this.currentStep + 1];
+                    html += `<span class="token predicted">${nextToken}?</span>`;
+                }
+
+                html += '<span class="cursor"></span>';
+                display.innerHTML = html;
+
+                // Predictions
+                const predictionsEl = document.getElementById('predictions');
+                const predictions = this.sentenceData.predictions[this.currentStep];
+                const chosenWord = this.currentStep < this.sentenceData.tokens.length - 1
+                    ? this.sentenceData.tokens[this.currentStep + 1].toLowerCase()
+                    : null;
+
+                predictionsEl.innerHTML = predictions.slice(0, 4).map(([word, prob]) => {
+                    const isChosen = word.toLowerCase() === chosenWord?.toLowerCase();
+                    return `
+                        <div class="prediction-item ${isChosen ? 'chosen' : ''}">
+                            <span class="prediction-word">${word}</span>
+                            <div class="prediction-bar-bg">
+                                <div class="prediction-bar" style="width: ${prob * 200}%"></div>
+                            </div>
+                            <span class="prediction-pct">${(prob * 100).toFixed(0)}%</span>
+                        </div>
+                    `;
+                }).join('');
+
+                // Nav buttons
+                document.getElementById('prev-btn').disabled = this.currentStep === 0;
+                document.getElementById('next-btn').textContent =
+                    this.currentStep >= this.sentenceData.tokens.length - 1 ? 'Done ✓' : 'Add Token →';
+            }
+
+            nextStep() {
+                if (this.currentStep < this.sentenceData.tokens.length - 1) {
+                    this.currentStep++;
+                    this.renderContextVector();
+                    this.updateDisplay();
+                }
+            }
+
+            prevStep() {
+                if (this.currentStep > 0) {
+                    this.currentStep--;
+                    this.renderContextVector();
+                    this.updateDisplay();
+                }
+            }
+
+            reset() {
+                this.currentStep = 0;
+                this.isPlaying = false;
+                document.getElementById('play-btn').textContent = '▶';
+                this.renderContextVector();
+                this.updateDisplay();
+            }
+
+            selectSentence(sentence) {
+                this.currentSentence = sentence;
+                this.reset();
+
+                document.querySelectorAll('.selector-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.sentence === sentence);
+                });
+            }
+
+            autoPlay() {
+                if (this.isPlaying) {
+                    this.isPlaying = false;
+                    document.getElementById('play-btn').textContent = '▶';
+                    return;
+                }
+
+                this.isPlaying = true;
+                document.getElementById('play-btn').textContent = '⏸';
+
+                const step = () => {
+                    if (!this.isPlaying) return;
+                    if (this.currentStep < this.sentenceData.tokens.length - 1) {
+                        this.nextStep();
+                        setTimeout(step, 1000);
+                    } else {
+                        this.isPlaying = false;
+                        document.getElementById('play-btn').textContent = '▶';
+                    }
+                };
+
+                setTimeout(step, 600);
+            }
+
+            setupEventListeners() {
+                document.getElementById('next-btn').addEventListener('click', () => this.nextStep());
+                document.getElementById('prev-btn').addEventListener('click', () => this.prevStep());
+                document.getElementById('play-btn').addEventListener('click', () => this.autoPlay());
+                document.getElementById('step-forward').addEventListener('click', () => this.nextStep());
+                document.getElementById('step-back').addEventListener('click', () => this.prevStep());
+
+                document.getElementById('rotate-btn').addEventListener('click', () => {
+                    this.isRotating = !this.isRotating;
+                    this.scene.style.animation = this.isRotating ? 'slowRotate 45s linear infinite' : 'none';
+                    document.getElementById('rotate-btn').classList.toggle('active', this.isRotating);
+                });
+
+                document.getElementById('reset-view').addEventListener('click', () => {
+                    this.scene.style.transform = 'rotateX(15deg) rotateY(-20deg)';
+                    this.scene.style.animation = 'none';
+                    this.isRotating = false;
+                    document.getElementById('rotate-btn').classList.remove('active');
+                });
+
+                document.querySelectorAll('.selector-btn').forEach(btn => {
+                    btn.addEventListener('click', () => this.selectSentence(btn.dataset.sentence));
+                });
+
+                window.addEventListener('resize', () => {
+                    this.updateDimensions();
+                    this.renderWords();
+                    this.renderContextVector();
+                });
+
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'ArrowRight') this.nextStep();
+                    if (e.key === 'ArrowLeft') this.prevStep();
+                    if (e.key === ' ') { e.preventDefault(); this.autoPlay(); }
+                });
+
+                // Drag rotation
+                let isDragging = false;
+                let startX, startY;
+                let rotateX = 15, rotateY = -20;
+
+                this.container.addEventListener('mousedown', (e) => {
+                    if (e.target.closest('.legend, .sentence-selector, .playback-controls')) return;
+                    isDragging = true;
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    this.scene.style.animation = 'none';
+                    this.isRotating = false;
+                    document.getElementById('rotate-btn').classList.remove('active');
+                });
+
+                document.addEventListener('mousemove', (e) => {
+                    if (!isDragging) return;
+                    rotateY += (e.clientX - startX) * 0.5;
+                    rotateX -= (e.clientY - startY) * 0.3;
+                    rotateX = Math.max(-60, Math.min(60, rotateX));
+                    this.scene.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+                    startX = e.clientX;
+                    startY = e.clientY;
+                });
+
+                document.addEventListener('mouseup', () => isDragging = false);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new NextToken3DVisualizer();
+        });
+    </script>
+</body>
+</html>

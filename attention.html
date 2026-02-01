@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attention: How Context Shapes Meaning in 3D Space</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+            color: #e8e8e8;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            grid-template-rows: 60px 1fr;
+            height: 100vh;
+        }
+
+        header {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            background: rgba(0, 0, 0, 0.4);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        header h1 {
+            font-size: 17px;
+            font-weight: 500;
+        }
+
+        .nav-dots {
+            display: flex;
+            gap: 8px;
+        }
+
+        .nav-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .nav-dot.active {
+            background: #8b5cf6;
+            transform: scale(1.2);
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+        }
+
+        .control-btn {
+            padding: 8px 16px;
+            background: rgba(139, 92, 246, 0.2);
+            border: 1px solid rgba(139, 92, 246, 0.4);
+            color: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s ease;
+        }
+
+        .control-btn:hover {
+            background: rgba(139, 92, 246, 0.4);
+        }
+
+        .narrative-panel {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 20px 18px;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            overflow-y: auto;
+        }
+
+        .step-indicator {
+            font-size: 11px;
+            color: #8b5cf6;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .narrative-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            line-height: 1.3;
+        }
+
+        .narrative-content {
+            font-size: 13px;
+            line-height: 1.6;
+            color: rgba(255, 255, 255, 0.85);
+            flex: 1;
+        }
+
+        .narrative-content p {
+            margin-bottom: 10px;
+        }
+
+        .highlight { color: #a78bfa; font-weight: 500; }
+        .highlight-blue { color: #60a5fa; }
+        .highlight-orange { color: #fb923c; }
+        .highlight-red { color: #f87171; }
+
+        code {
+            background: rgba(139, 92, 246, 0.2);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 11px;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        .nav-btn {
+            flex: 1;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .nav-btn.prev {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        .nav-btn.prev:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .nav-btn.next {
+            background: #8b5cf6;
+            color: #fff;
+        }
+
+        /* Main visualization area */
+        .viz-container {
+            position: relative;
+            overflow: hidden;
+            perspective: 1200px;
+        }
+
+        /* 3D Scene */
+        .scene-3d {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transform: rotateX(12deg) rotateY(-15deg);
+            transition: transform 0.5s ease;
+        }
+
+        /* Word points */
+        .word-point {
+            position: absolute;
+            transform-style: preserve-3d;
+            cursor: pointer;
+            transition: all 0.5s ease;
+        }
+
+        .word-sphere {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            box-shadow: 0 0 12px currentColor;
+            transition: all 0.3s ease;
+        }
+
+        .word-point:hover .word-sphere {
+            transform: scale(1.4);
+        }
+
+        .word-label {
+            position: absolute;
+            left: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            white-space: nowrap;
+            font-size: 10px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.8);
+            text-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
+            pointer-events: none;
+        }
+
+        /* Category colors */
+        .category-nature { color: #22c55e; }
+        .category-institution { color: #f59e0b; }
+        .category-crime { color: #ef4444; }
+        .category-neutral { color: #8b5cf6; }
+
+        /* Bank origin */
+        .bank-origin .word-sphere {
+            width: 18px;
+            height: 18px;
+            background: #6b7280;
+            border: 2px dashed rgba(255, 255, 255, 0.5);
+            box-shadow: 0 0 12px rgba(107, 114, 128, 0.5);
+        }
+
+        /* Computed outputs */
+        .bank-point.nature .word-sphere {
+            width: 14px;
+            height: 14px;
+            background: linear-gradient(135deg, #60a5fa, #22c55e);
+            box-shadow: 0 0 18px #60a5fa, 0 0 35px #22c55e;
+        }
+
+        .bank-point.finance .word-sphere {
+            width: 14px;
+            height: 14px;
+            background: linear-gradient(135deg, #fb923c, #f59e0b);
+            box-shadow: 0 0 18px #fb923c, 0 0 35px #f59e0b;
+        }
+
+        .bank-point.crime .word-sphere {
+            width: 14px;
+            height: 14px;
+            background: linear-gradient(135deg, #f87171, #ef4444);
+            box-shadow: 0 0 18px #f87171, 0 0 35px #ef4444;
+        }
+
+        /* Connection lines */
+        .origin-line {
+            position: absolute;
+            height: 2px;
+            transform-origin: left center;
+            pointer-events: none;
+            opacity: 0.35;
+        }
+
+        .origin-line.nature { background: linear-gradient(to right, #6b7280, #60a5fa); }
+        .origin-line.finance { background: linear-gradient(to right, #6b7280, #fb923c); }
+        .origin-line.crime { background: linear-gradient(to right, #6b7280, #f87171); }
+
+        /* Computation trail */
+        .computation-trail {
+            position: absolute;
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            pointer-events: none;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        /* Attention weights panel - NEW */
+        .attention-panel {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            right: 16px;
+            background: rgba(0, 0, 0, 0.85);
+            border-radius: 12px;
+            padding: 16px 18px;
+            z-index: 20;
+            display: flex;
+            gap: 20px;
+        }
+
+        .attention-column {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .attention-header {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+
+        .attention-header.nature { color: #60a5fa; }
+        .attention-header.finance { color: #fb923c; }
+        .attention-header.crime { color: #f87171; }
+
+        .sentence-display {
+            font-size: 12px;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            font-family: 'SF Mono', Monaco, monospace;
+            line-height: 1.4;
+        }
+
+        .sentence-display .processed {
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .sentence-display .pending {
+            color: rgba(255,255,255,0.3);
+        }
+
+        .sentence-display .current-token {
+            background: rgba(255,255,255,0.2);
+            padding: 1px 4px;
+            border-radius: 3px;
+        }
+
+        .attention-label {
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            opacity: 0.5;
+            margin-bottom: 6px;
+        }
+
+        .attention-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+            font-size: 11px;
+        }
+
+        .attention-word {
+            width: 65px;
+            text-align: right;
+            opacity: 0.7;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .attention-bar-bg {
+            flex: 1;
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .attention-bar {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.4s ease;
+        }
+
+        .attention-bar.nature { background: #60a5fa; }
+        .attention-bar.finance { background: #fb923c; }
+        .attention-bar.crime { background: #f87171; }
+
+        .attention-value {
+            width: 35px;
+            font-family: 'SF Mono', monospace;
+            font-size: 10px;
+            opacity: 0.6;
+        }
+
+        /* Legend */
+        .legend {
+            position: absolute;
+            bottom: 16px;
+            left: 16px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 10px;
+            padding: 12px 14px;
+            z-index: 10;
+            max-width: 260px;
+        }
+
+        .legend-title {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            opacity: 0.7;
+        }
+
+        .legend-items {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 10px;
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .legend-dot.dashed {
+            border: 2px dashed rgba(255,255,255,0.5);
+            background: #6b7280;
+        }
+
+        /* Semantic regions label */
+        .region-labels {
+            position: absolute;
+            pointer-events: none;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            opacity: 0.4;
+        }
+
+        .region-label-nature {
+            bottom: 45%;
+            left: 8%;
+            color: #22c55e;
+        }
+
+        .region-label-institution {
+            top: 30%;
+            right: 8%;
+            color: #f59e0b;
+        }
+
+        .region-label-crime {
+            bottom: 38%;
+            right: 8%;
+            color: #ef4444;
+        }
+
+        /* Play controls */
+        .playback-controls {
+            position: absolute;
+            bottom: 16px;
+            right: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 10px;
+            padding: 10px 14px;
+            z-index: 10;
+        }
+
+        .play-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #8b5cf6;
+            border: none;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .play-btn:hover {
+            background: #7c3aed;
+            transform: scale(1.1);
+        }
+
+        .step-display {
+            font-size: 12px;
+        }
+
+        .step-display .token-count {
+            font-weight: 600;
+            color: #a78bfa;
+        }
+
+        /* Tooltip */
+        .info-tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: 11px;
+            max-width: 200px;
+            z-index: 100;
+            display: none;
+            pointer-events: none;
+        }
+
+        .info-tooltip.visible {
+            display: block;
+        }
+
+        @keyframes slowRotate {
+            0% { transform: rotateX(12deg) rotateY(-15deg); }
+            100% { transform: rotateX(12deg) rotateY(345deg); }
+        }
+
+        @media (max-width: 1100px) {
+            .container {
+                grid-template-columns: 1fr;
+                grid-template-rows: 60px 140px 1fr;
+            }
+
+            .narrative-panel {
+                border-right: none;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            }
+
+            .attention-panel {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Attention: How Context Shapes Meaning</h1>
+            <div class="nav-dots">
+                <div class="nav-dot active" data-step="0"></div>
+                <div class="nav-dot" data-step="1"></div>
+                <div class="nav-dot" data-step="2"></div>
+                <div class="nav-dot" data-step="3"></div>
+            </div>
+            <div class="controls">
+                <button class="control-btn" id="rotate-btn">Rotate</button>
+                <button class="control-btn" id="reset-btn">Reset</button>
+            </div>
+        </header>
+
+        <aside class="narrative-panel">
+            <div class="step-indicator">Step <span id="step-num">1</span> of 4</div>
+            <h2 class="narrative-title" id="narrative-title">Loading...</h2>
+            <div class="narrative-content" id="narrative-content">
+                <p>Loading...</p>
+            </div>
+            <div class="nav-buttons">
+                <button class="nav-btn prev" id="prev-btn" disabled>← Back</button>
+                <button class="nav-btn next" id="next-btn">Next →</button>
+            </div>
+        </aside>
+
+        <main class="viz-container" id="viz-container">
+            <div class="scene-3d" id="scene">
+                <!-- Word points rendered here -->
+            </div>
+
+            <!-- Attention weights panel -->
+            <div class="attention-panel" id="attention-panel">
+                <div class="attention-column">
+                    <div class="attention-header nature">Sentence A (river bank)</div>
+                    <div class="sentence-display" id="sentence-a"></div>
+                    <div class="attention-label">"bank" attends to:</div>
+                    <div id="attention-rows-a"></div>
+                </div>
+                <div class="attention-column">
+                    <div class="attention-header finance">Sentence B (finance)</div>
+                    <div class="sentence-display" id="sentence-b"></div>
+                    <div class="attention-label">"bank" attends to:</div>
+                    <div id="attention-rows-b"></div>
+                </div>
+                <div class="attention-column">
+                    <div class="attention-header crime">Sentence C (robbery)</div>
+                    <div class="sentence-display" id="sentence-c"></div>
+                    <div class="attention-label">"bank" attends to:</div>
+                    <div id="attention-rows-c"></div>
+                </div>
+            </div>
+
+            <!-- Semantic region labels -->
+            <div class="region-labels region-label-nature">← Nature (river bank)</div>
+            <div class="region-labels region-label-institution">Financial Institution →</div>
+            <div class="region-labels region-label-crime">(negative context) ↓</div>
+
+            <div class="legend" id="legend">
+                <div class="legend-title">What Each Dot Represents</div>
+                <div class="legend-items">
+                    <div class="legend-item">
+                        <div class="legend-dot dashed"></div>
+                        <span><strong>"bank" embedding</strong> (fixed origin)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-dot" style="background: linear-gradient(135deg, #60a5fa, #22c55e)"></div>
+                        <span>Computed output A (nature)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-dot" style="background: linear-gradient(135deg, #fb923c, #f59e0b)"></div>
+                        <span>Computed output B (finance+)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-dot" style="background: linear-gradient(135deg, #f87171, #ef4444)"></div>
+                        <span>Computed output C (finance−)</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="playback-controls" id="playback">
+                <button class="play-btn" id="play-btn">▶</button>
+                <div class="step-display">
+                    Token <span class="token-count" id="token-count">1</span>/<span id="token-total">7</span>
+                </div>
+                <button class="control-btn" id="step-back">←</button>
+                <button class="control-btn" id="step-forward">→</button>
+            </div>
+
+            <div class="info-tooltip" id="tooltip"></div>
+        </main>
+    </div>
+
+    <script>
+        // ============================================
+        // DATA: Repositioned so finance & crime are adjacent
+        // X = Nature (-) to Institution (+)
+        // Y = Positive (+) to Negative (-)
+        // Finance and Crime are BOTH on +X side (institution)
+        // but separated on Y axis (positive vs negative)
+        // ============================================
+        const WORDS_3D = {
+            // Nature cluster - LEFT side (negative X)
+            nature: [
+                { word: "river", x: -0.75, y: 0.1, z: 0.2, category: "nature" },
+                { word: "water", x: -0.65, y: 0.2, z: 0.4, category: "nature" },
+                { word: "steep", x: -0.7, y: -0.05, z: 0.1, category: "nature" },
+                { word: "stream", x: -0.8, y: 0.15, z: 0.3, category: "nature" },
+                { word: "shore", x: -0.72, y: 0.0, z: 0.5, category: "nature" },
+            ],
+            // Institution cluster - RIGHT side, UPPER (positive X, positive Y)
+            institution: [
+                { word: "approved", x: 0.65, y: 0.55, z: -0.2, category: "institution" },
+                { word: "loan", x: 0.7, y: 0.4, z: -0.35, category: "institution" },
+                { word: "savings", x: 0.55, y: 0.65, z: -0.1, category: "institution" },
+                { word: "deposit", x: 0.6, y: 0.5, z: -0.4, category: "institution" },
+                { word: "account", x: 0.72, y: 0.45, z: -0.25, category: "institution" },
+            ],
+            // Crime cluster - RIGHT side, LOWER (positive X, slightly negative Y)
+            // Close to institution because it's still "financial bank"
+            crime: [
+                { word: "robbed", x: 0.82, y: -0.2, z: 0.15, category: "crime" },
+                { word: "police", x: 0.72, y: -0.12, z: 0.3, category: "crime" },
+                { word: "theft", x: 0.88, y: -0.28, z: 0.2, category: "crime" },
+                { word: "alarm", x: 0.75, y: -0.18, z: 0.4, category: "crime" },
+                { word: "criminal", x: 0.8, y: -0.25, z: 0.1, category: "crime" },
+            ],
+            // Neutral - center
+            neutral: [
+                { word: "the", x: 0.0, y: 0.1, z: 0.0, category: "neutral" },
+                { word: "was", x: 0.05, y: 0.0, z: -0.05, category: "neutral" },
+                { word: "by", x: -0.08, y: 0.05, z: 0.05, category: "neutral" },
+            ]
+        };
+
+        const BANK_ORIGIN = { x: 0.0, y: 0.0, z: 0.0 };
+
+        const SENTENCES = {
+            nature: ["The", "bank", "by", "the", "river", "was", "steep"],
+            finance: ["The", "bank", "approved", "my", "loan", "today", "!"],
+            crime: ["The", "bank", "was", "robbed", "last", "night", "."]
+        };
+
+        // Attention weights: how much "bank" attends to each word at each step
+        // These simulate what attention heads might compute
+        const ATTENTION_WEIGHTS = {
+            nature: [
+                { "The": 0.5, "bank": 0.5 },
+                { "The": 0.3, "bank": 0.7 },
+                { "The": 0.2, "bank": 0.5, "by": 0.3 },
+                { "The": 0.15, "bank": 0.4, "by": 0.25, "the": 0.2 },
+                { "The": 0.1, "bank": 0.25, "by": 0.15, "the": 0.1, "river": 0.4 },
+                { "The": 0.08, "bank": 0.2, "by": 0.1, "the": 0.07, "river": 0.35, "was": 0.2 },
+                { "The": 0.05, "bank": 0.15, "by": 0.08, "the": 0.05, "river": 0.32, "was": 0.15, "steep": 0.2 },
+            ],
+            finance: [
+                { "The": 0.5, "bank": 0.5 },
+                { "The": 0.3, "bank": 0.7 },
+                { "The": 0.15, "bank": 0.35, "approved": 0.5 },
+                { "The": 0.1, "bank": 0.3, "approved": 0.4, "my": 0.2 },
+                { "The": 0.08, "bank": 0.25, "approved": 0.3, "my": 0.12, "loan": 0.25 },
+                { "The": 0.05, "bank": 0.2, "approved": 0.25, "my": 0.1, "loan": 0.25, "today": 0.15 },
+                { "The": 0.05, "bank": 0.18, "approved": 0.22, "my": 0.08, "loan": 0.25, "today": 0.12, "!": 0.1 },
+            ],
+            crime: [
+                { "The": 0.5, "bank": 0.5 },
+                { "The": 0.3, "bank": 0.7 },
+                { "The": 0.2, "bank": 0.5, "was": 0.3 },
+                { "The": 0.1, "bank": 0.25, "was": 0.15, "robbed": 0.5 },
+                { "The": 0.08, "bank": 0.2, "was": 0.1, "robbed": 0.42, "last": 0.2 },
+                { "The": 0.05, "bank": 0.18, "was": 0.08, "robbed": 0.38, "last": 0.15, "night": 0.16 },
+                { "The": 0.05, "bank": 0.15, "was": 0.07, "robbed": 0.35, "last": 0.13, "night": 0.15, ".": 0.1 },
+            ]
+        };
+
+        // Computed positions - adjusted for new layout
+        const BANK_COMPUTED = {
+            nature: [
+                { x: 0.0, y: 0.0, z: 0.0 },
+                { x: 0.0, y: 0.0, z: 0.0 },
+                { x: -0.12, y: 0.02, z: 0.08 },
+                { x: -0.22, y: 0.03, z: 0.12 },
+                { x: -0.52, y: 0.08, z: 0.18 },
+                { x: -0.62, y: 0.06, z: 0.2 },
+                { x: -0.7, y: 0.02, z: 0.22 },
+            ],
+            finance: [
+                { x: 0.0, y: 0.0, z: 0.0 },
+                { x: 0.0, y: 0.0, z: 0.0 },
+                { x: 0.28, y: 0.35, z: -0.1 },
+                { x: 0.38, y: 0.42, z: -0.18 },
+                { x: 0.52, y: 0.48, z: -0.25 },
+                { x: 0.58, y: 0.52, z: -0.28 },
+                { x: 0.62, y: 0.55, z: -0.3 },
+            ],
+            crime: [
+                { x: 0.0, y: 0.0, z: 0.0 },
+                { x: 0.0, y: 0.0, z: 0.0 },
+                { x: 0.1, y: -0.04, z: 0.05 },
+                { x: 0.5, y: -0.12, z: 0.12 },
+                { x: 0.68, y: -0.18, z: 0.16 },
+                { x: 0.75, y: -0.2, z: 0.18 },
+                { x: 0.8, y: -0.22, z: 0.2 },
+            ]
+        };
+
+        // ============================================
+        // NARRATIVE
+        // ============================================
+        const NARRATIVE_STEPS = [
+            {
+                title: "Attention Weights Drive Movement",
+                content: `
+                    <p>The <span class="highlight">attention bars</span> above show how strongly "bank" attends to each word.</p>
+                    <p>When "river" appears, it gets <span class="highlight-blue">high attention</span> → pulls "bank" left toward nature.</p>
+                    <p>When "robbed" appears, it gets <span class="highlight-red">high attention</span> → pulls "bank" right toward crime.</p>
+                    <p>Notice: crime and finance clusters are <span class="highlight">adjacent</span> (both are "financial institution"), but separated by sentiment.</p>
+                `,
+                showAttention: true,
+                showPlayback: true
+            },
+            {
+                title: "Same Institution, Different Context",
+                content: `
+                    <p>Sentences B and C both refer to a <span class="highlight">financial bank</span>, so their outputs land on the same side of the space.</p>
+                    <p>But the <span class="highlight-orange">positive context</span> (approved, loan) pulls B upward, while <span class="highlight-red">negative context</span> (robbed) pulls C downward.</p>
+                    <p>The geometry encodes: <strong>meaning</strong> (X-axis) AND <strong>sentiment</strong> (Y-axis).</p>
+                `,
+                showAttention: true,
+                showPlayback: true
+            },
+            {
+                title: "Attention Creates the Pull",
+                content: `
+                    <p>The formula: <code>output = origin + Σ(weight × word)</code></p>
+                    <p>Watch how attention weights shift as tokens are added:</p>
+                    <p>• "river" gets 40% attention → strong pull toward nature</p>
+                    <p>• "robbed" gets 50% attention → strong pull toward crime</p>
+                    <p>• "approved" gets 50% attention → strong pull toward finance</p>
+                    <p>High-attention words dominate the computation.</p>
+                `,
+                showAttention: true,
+                showPlayback: true
+            },
+            {
+                title: "Policy Implications",
+                content: `
+                    <p><span class="highlight">Key insight:</span> Word meaning is computed dynamically via attention. The same word can land in completely different regions.</p>
+                    <p><span class="highlight">Prompt injection:</span> Adding high-attention trigger words can redirect outputs.</p>
+                    <p><span class="highlight">Bias:</span> If certain words consistently get higher attention weights, they disproportionately influence outputs.</p>
+                    <p><span class="highlight">Interpretability:</span> Attention weights reveal which words drove the model's interpretation.</p>
+                `,
+                showAttention: false,
+                showPlayback: false
+            }
+        ];
+
+        // ============================================
+        // VISUALIZATION
+        // ============================================
+        class AttentionVisualizer3D {
+            constructor() {
+                this.scene = document.getElementById('scene');
+                this.container = document.getElementById('viz-container');
+                this.tooltip = document.getElementById('tooltip');
+
+                this.currentStep = 0;
+                this.currentToken = 0;
+                this.isPlaying = false;
+                this.isRotating = false;
+
+                this.centerX = 0;
+                this.centerY = 0;
+                this.scale = 220;
+
+                this.init();
+            }
+
+            init() {
+                this.updateDimensions();
+                this.renderStaticWords();
+                this.renderBankOrigin();
+                this.renderComputedOutputs();
+                this.renderSentenceProgress();
+                this.renderAttentionWeights();
+                this.setupEventListeners();
+                this.goToStep(0);
+                this.updateTokenDisplay();
+
+                window.addEventListener('resize', () => {
+                    this.updateDimensions();
+                    this.renderStaticWords();
+                    this.renderBankOrigin();
+                    this.renderComputedOutputs();
+                });
+            }
+
+            updateDimensions() {
+                const rect = this.container.getBoundingClientRect();
+                this.centerX = rect.width / 2;
+                this.centerY = rect.height / 2 + 40; // offset for attention panel
+                this.scale = Math.min(rect.width, rect.height) * 0.48;
+            }
+
+            to2D(x, y, z) {
+                const perspective = 800;
+                const zOffset = z * this.scale;
+                const scale = perspective / (perspective + zOffset);
+                return {
+                    x: this.centerX + x * this.scale * scale,
+                    y: this.centerY - y * this.scale * scale,
+                    z: zOffset,
+                    scale: scale
+                };
+            }
+
+            renderStaticWords() {
+                this.scene.querySelectorAll('.word-point:not(.bank-point):not(.bank-origin)').forEach(el => el.remove());
+
+                const allWords = [
+                    ...WORDS_3D.nature,
+                    ...WORDS_3D.institution,
+                    ...WORDS_3D.crime,
+                    ...WORDS_3D.neutral
+                ];
+
+                const categoryColors = {
+                    nature: '#22c55e',
+                    institution: '#f59e0b',
+                    crime: '#ef4444',
+                    neutral: '#8b5cf6'
+                };
+
+                for (const wordData of allWords) {
+                    const pos = this.to2D(wordData.x, wordData.y, wordData.z);
+
+                    const point = document.createElement('div');
+                    point.className = `word-point category-${wordData.category}`;
+                    point.style.left = `${pos.x}px`;
+                    point.style.top = `${pos.y}px`;
+                    point.style.transform = `translateZ(${pos.z}px) scale(${pos.scale})`;
+                    point.style.opacity = 0.5 + pos.scale * 0.3;
+
+                    point.innerHTML = `
+                        <div class="word-sphere" style="background: ${categoryColors[wordData.category]}"></div>
+                        <div class="word-label">${wordData.word}</div>
+                    `;
+
+                    point.addEventListener('mouseenter', (e) => this.showTooltip(e, wordData));
+                    point.addEventListener('mouseleave', () => this.hideTooltip());
+
+                    this.scene.appendChild(point);
+                }
+            }
+
+            renderBankOrigin() {
+                this.scene.querySelectorAll('.bank-origin').forEach(el => el.remove());
+
+                const pos = this.to2D(BANK_ORIGIN.x, BANK_ORIGIN.y, BANK_ORIGIN.z);
+
+                const point = document.createElement('div');
+                point.className = 'word-point bank-origin';
+                point.style.left = `${pos.x}px`;
+                point.style.top = `${pos.y}px`;
+                point.innerHTML = `
+                    <div class="word-sphere"></div>
+                    <div class="word-label" style="color: #9ca3af">"bank"</div>
+                `;
+                this.scene.appendChild(point);
+            }
+
+            renderComputedOutputs() {
+                this.scene.querySelectorAll('.bank-point, .origin-line, .computation-trail').forEach(el => el.remove());
+
+                this.renderTrails();
+
+                const configs = [
+                    { key: 'nature', label: 'A', color: '#60a5fa' },
+                    { key: 'finance', label: 'B', color: '#fb923c' },
+                    { key: 'crime', label: 'C', color: '#f87171' }
+                ];
+
+                const originScreen = this.to2D(BANK_ORIGIN.x, BANK_ORIGIN.y, BANK_ORIGIN.z);
+
+                for (const config of configs) {
+                    const pos = BANK_COMPUTED[config.key][this.currentToken];
+                    const screen = this.to2D(pos.x, pos.y, pos.z);
+
+                    // Line from origin
+                    const dx = screen.x - originScreen.x;
+                    const dy = screen.y - originScreen.y;
+                    const length = Math.sqrt(dx * dx + dy * dy);
+                    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+
+                    if (length > 5) {
+                        const line = document.createElement('div');
+                        line.className = `origin-line ${config.key}`;
+                        line.style.left = `${originScreen.x}px`;
+                        line.style.top = `${originScreen.y}px`;
+                        line.style.width = `${length}px`;
+                        line.style.transform = `rotate(${angle}deg)`;
+                        this.scene.appendChild(line);
+                    }
+
+                    // Output point
+                    const point = document.createElement('div');
+                    point.className = `word-point bank-point ${config.key}`;
+                    point.style.left = `${screen.x}px`;
+                    point.style.top = `${screen.y}px`;
+                    point.innerHTML = `
+                        <div class="word-sphere"></div>
+                        <div class="word-label" style="color: ${config.color}">${config.label}</div>
+                    `;
+                    this.scene.appendChild(point);
+                }
+            }
+
+            renderTrails() {
+                const configs = [
+                    { key: 'nature', color: '#60a5fa' },
+                    { key: 'finance', color: '#fb923c' },
+                    { key: 'crime', color: '#f87171' }
+                ];
+
+                for (let i = 0; i < this.currentToken; i++) {
+                    for (const config of configs) {
+                        const pos = BANK_COMPUTED[config.key][i];
+                        const screen = this.to2D(pos.x, pos.y, pos.z);
+                        const trail = document.createElement('div');
+                        trail.className = 'computation-trail';
+                        trail.style.left = `${screen.x - 2}px`;
+                        trail.style.top = `${screen.y - 2}px`;
+                        trail.style.background = config.color;
+                        trail.style.opacity = 0.2 + (i / Math.max(1, this.currentToken)) * 0.4;
+                        this.scene.appendChild(trail);
+                    }
+                }
+            }
+
+            renderSentenceProgress() {
+                const configs = [
+                    { key: 'nature', containerId: 'sentence-a' },
+                    { key: 'finance', containerId: 'sentence-b' },
+                    { key: 'crime', containerId: 'sentence-c' }
+                ];
+
+                for (const config of configs) {
+                    const container = document.getElementById(config.containerId);
+                    const sentence = SENTENCES[config.key];
+
+                    let html = '"';
+                    for (let i = 0; i < sentence.length; i++) {
+                        if (i <= this.currentToken) {
+                            if (i === this.currentToken) {
+                                html += `<span class="processed current-token">${sentence[i]}</span>`;
+                            } else {
+                                html += `<span class="processed">${sentence[i]}</span>`;
+                            }
+                        } else {
+                            html += `<span class="pending">${sentence[i]}</span>`;
+                        }
+                        if (i < sentence.length - 1) html += ' ';
+                    }
+                    html += '"';
+                    container.innerHTML = html;
+                }
+            }
+
+            renderAttentionWeights() {
+                const configs = [
+                    { key: 'nature', containerId: 'attention-rows-a', class: 'nature' },
+                    { key: 'finance', containerId: 'attention-rows-b', class: 'finance' },
+                    { key: 'crime', containerId: 'attention-rows-c', class: 'crime' }
+                ];
+
+                for (const config of configs) {
+                    const container = document.getElementById(config.containerId);
+                    const weights = ATTENTION_WEIGHTS[config.key][this.currentToken];
+
+                    // Sort by weight descending
+                    const sorted = Object.entries(weights).sort((a, b) => b[1] - a[1]);
+
+                    container.innerHTML = sorted.slice(0, 5).map(([word, weight]) => `
+                        <div class="attention-row">
+                            <span class="attention-word">${word}</span>
+                            <div class="attention-bar-bg">
+                                <div class="attention-bar ${config.class}" style="width: ${weight * 100}%"></div>
+                            </div>
+                            <span class="attention-value">${(weight * 100).toFixed(0)}%</span>
+                        </div>
+                    `).join('');
+                }
+            }
+
+            updateTokenDisplay() {
+                document.getElementById('token-count').textContent = this.currentToken + 1;
+                document.getElementById('token-total').textContent = SENTENCES.nature.length;
+            }
+
+            stepForward() {
+                if (this.currentToken < SENTENCES.nature.length - 1) {
+                    this.currentToken++;
+                    this.renderComputedOutputs();
+                    this.renderSentenceProgress();
+                    this.renderAttentionWeights();
+                    this.updateTokenDisplay();
+                }
+            }
+
+            stepBack() {
+                if (this.currentToken > 0) {
+                    this.currentToken--;
+                    this.renderComputedOutputs();
+                    this.renderSentenceProgress();
+                    this.renderAttentionWeights();
+                    this.updateTokenDisplay();
+                }
+            }
+
+            play() {
+                if (this.isPlaying) {
+                    this.isPlaying = false;
+                    document.getElementById('play-btn').textContent = '▶';
+                    return;
+                }
+
+                this.isPlaying = true;
+                document.getElementById('play-btn').textContent = '⏸';
+
+                const animate = () => {
+                    if (!this.isPlaying) return;
+                    if (this.currentToken < SENTENCES.nature.length - 1) {
+                        this.stepForward();
+                        setTimeout(animate, 1000);
+                    } else {
+                        this.isPlaying = false;
+                        document.getElementById('play-btn').textContent = '▶';
+                    }
+                };
+
+                setTimeout(animate, 500);
+            }
+
+            resetPlayback() {
+                this.currentToken = 0;
+                this.isPlaying = false;
+                document.getElementById('play-btn').textContent = '▶';
+                this.renderComputedOutputs();
+                this.renderSentenceProgress();
+                this.renderAttentionWeights();
+                this.updateTokenDisplay();
+            }
+
+            showTooltip(e, wordData) {
+                const categoryNames = {
+                    nature: 'Nature (river bank)',
+                    institution: 'Financial institution',
+                    crime: 'Crime context',
+                    neutral: 'Neutral word'
+                };
+                this.tooltip.innerHTML = `
+                    <strong>${wordData.word}</strong><br>
+                    <span style="opacity: 0.7">${categoryNames[wordData.category]}</span>
+                `;
+                this.tooltip.style.left = `${e.clientX + 10}px`;
+                this.tooltip.style.top = `${e.clientY + 10}px`;
+                this.tooltip.classList.add('visible');
+            }
+
+            hideTooltip() {
+                this.tooltip.classList.remove('visible');
+            }
+
+            goToStep(stepIndex) {
+                if (stepIndex < 0 || stepIndex >= NARRATIVE_STEPS.length) return;
+
+                this.currentStep = stepIndex;
+                const step = NARRATIVE_STEPS[stepIndex];
+
+                document.getElementById('step-num').textContent = stepIndex + 1;
+                document.getElementById('narrative-title').textContent = step.title;
+                document.getElementById('narrative-content').innerHTML = step.content;
+
+                document.querySelectorAll('.nav-dot').forEach((dot, i) => {
+                    dot.classList.toggle('active', i === stepIndex);
+                });
+
+                document.getElementById('prev-btn').disabled = stepIndex === 0;
+                document.getElementById('next-btn').textContent =
+                    stepIndex === NARRATIVE_STEPS.length - 1 ? 'Restart →' : 'Next →';
+
+                document.getElementById('attention-panel').style.display = step.showAttention ? 'flex' : 'none';
+                document.getElementById('playback').style.display = step.showPlayback ? 'flex' : 'none';
+
+                if (stepIndex === 0) {
+                    this.resetPlayback();
+                }
+            }
+
+            nextStep() {
+                if (this.currentStep < NARRATIVE_STEPS.length - 1) {
+                    this.goToStep(this.currentStep + 1);
+                } else {
+                    this.goToStep(0);
+                }
+            }
+
+            prevStep() {
+                if (this.currentStep > 0) {
+                    this.goToStep(this.currentStep - 1);
+                }
+            }
+
+            setupEventListeners() {
+                document.getElementById('next-btn').addEventListener('click', () => this.nextStep());
+                document.getElementById('prev-btn').addEventListener('click', () => this.prevStep());
+
+                document.querySelectorAll('.nav-dot').forEach(dot => {
+                    dot.addEventListener('click', () => {
+                        this.goToStep(parseInt(dot.dataset.step));
+                    });
+                });
+
+                document.getElementById('play-btn').addEventListener('click', () => this.play());
+                document.getElementById('step-forward').addEventListener('click', () => this.stepForward());
+                document.getElementById('step-back').addEventListener('click', () => this.stepBack());
+
+                document.getElementById('rotate-btn').addEventListener('click', () => {
+                    this.isRotating = !this.isRotating;
+                    this.scene.style.animation = this.isRotating ? 'slowRotate 60s linear infinite' : 'none';
+                });
+
+                document.getElementById('reset-btn').addEventListener('click', () => {
+                    this.scene.style.transform = 'rotateX(12deg) rotateY(-15deg)';
+                    this.scene.style.animation = 'none';
+                    this.isRotating = false;
+                });
+
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'ArrowRight') this.stepForward();
+                    if (e.key === 'ArrowLeft') this.stepBack();
+                    if (e.key === ' ') { e.preventDefault(); this.play(); }
+                });
+
+                // Drag rotation
+                let isDragging = false;
+                let startX, startY;
+                let currentRotateX = 12, currentRotateY = -15;
+
+                this.container.addEventListener('mousedown', (e) => {
+                    if (e.target.closest('.legend, .playback-controls, .attention-panel')) return;
+                    isDragging = true;
+                    startX = e.clientX;
+                    startY = e.clientY;
+                });
+
+                document.addEventListener('mousemove', (e) => {
+                    if (!isDragging) return;
+                    currentRotateY += (e.clientX - startX) * 0.5;
+                    currentRotateX -= (e.clientY - startY) * 0.3;
+                    currentRotateX = Math.max(-60, Math.min(60, currentRotateX));
+                    this.scene.style.transform = `rotateX(${currentRotateX}deg) rotateY(${currentRotateY}deg)`;
+                    this.scene.style.animation = 'none';
+                    startX = e.clientX;
+                    startY = e.clientY;
+                });
+
+                document.addEventListener('mouseup', () => isDragging = false);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new AttentionVisualizer3D();
+        });
+    </script>
+</body>
+</html>
