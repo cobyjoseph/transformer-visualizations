@@ -633,7 +633,7 @@
 
         <aside class="explanation-panel">
             <div class="concept-box">
-                <strong>Core idea:</strong> Each word is a point in 768-dimensional space. As tokens are added, a new <strong>output vector</strong> is computed. It moves along <strong>many dimensions at once</strong>. The next word is chosen by what's nearest.
+                <strong>Core idea:</strong> Each word starts at a fixed position. As the model processes context, it computes a new <strong>output vector</strong>. This output can activate <strong>multiple dimensions independently</strong> — "nature" and "institution" are separate dimensions, not opposites. The next word is chosen by what's nearest to that output.
             </div>
 
             <div class="sentence-builder">
@@ -649,40 +649,38 @@
                 <div class="dimension-row">
                     <span class="dimension-label">Dim 12:</span>
                     <div class="dimension-bar-container">
-                        <div class="dimension-bar-center"></div>
-                        <div class="dimension-bar" id="dim-x"></div>
+                        <div class="dimension-bar" id="dim-nature" style="left: 0;"></div>
                     </div>
-                    <span class="dimension-value" id="dim-x-val">0.00</span>
+                    <span class="dimension-value" id="dim-nature-val">0.00</span>
                 </div>
                 <div class="dimension-endpoints">
-                    <span>← nature</span>
-                    <span>institution →</span>
+                    <span>low</span>
+                    <span>Nature →</span>
                 </div>
 
                 <div class="dimension-row" style="margin-top: 8px;">
                     <span class="dimension-label">Dim 47:</span>
                     <div class="dimension-bar-container">
-                        <div class="dimension-bar-center"></div>
-                        <div class="dimension-bar" id="dim-y"></div>
+                        <div class="dimension-bar" id="dim-institution" style="left: 0;"></div>
                     </div>
-                    <span class="dimension-value" id="dim-y-val">0.00</span>
+                    <span class="dimension-value" id="dim-institution-val">0.00</span>
                 </div>
                 <div class="dimension-endpoints">
-                    <span>← negative</span>
-                    <span>positive →</span>
+                    <span>low</span>
+                    <span>Institution →</span>
                 </div>
 
                 <div class="dimension-row" style="margin-top: 8px;">
                     <span class="dimension-label">Dim 203:</span>
                     <div class="dimension-bar-container">
                         <div class="dimension-bar-center"></div>
-                        <div class="dimension-bar" id="dim-z"></div>
+                        <div class="dimension-bar" id="dim-sentiment"></div>
                     </div>
-                    <span class="dimension-value" id="dim-z-val">0.00</span>
+                    <span class="dimension-value" id="dim-sentiment-val">0.00</span>
                 </div>
                 <div class="dimension-endpoints">
-                    <span>← tangible</span>
-                    <span>conceptual →</span>
+                    <span>← negative</span>
+                    <span>positive →</span>
                 </div>
             </div>
 
@@ -703,11 +701,11 @@
             </div>
 
             <!-- Axis labels -->
-            <div class="axis-label axis-x-left">← Dim 12 (nature)</div>
-            <div class="axis-label axis-x-right">Dim 12 (institution) →</div>
-            <div class="axis-label axis-y-top">Dim 47 (positive) ↑</div>
-            <div class="axis-label axis-y-bottom">Dim 47 (negative) ↓</div>
-            <div class="axis-label axis-z-label">Depth = Dim 203 (tangible↔conceptual)</div>
+            <div class="axis-label axis-x-left">← low Nature</div>
+            <div class="axis-label axis-x-right">high Nature →</div>
+            <div class="axis-label axis-y-top">positive ↑</div>
+            <div class="axis-label axis-y-bottom">negative ↓</div>
+            <div class="axis-label axis-z-label">Depth = Institution (front=low, back=high)</div>
 
             <div class="legend">
                 <div class="legend-title">Word Categories</div>
@@ -748,57 +746,58 @@
 
     <script>
         // 3D word positions
-        // X: nature (-) to finance (+)
-        // Y: negative (-) to positive (+)
-        // Z: concrete (-) to abstract (+)
+        // X: Nature dimension (low=left, high=right)
+        // Y: Sentiment (negative=down, positive=up)
+        // Z: Institution dimension (low=front, high=back)
         const WORDS_3D = {
-            // Function words (center, slightly abstract)
-            "the": { x: 0, y: 0, z: 0.1, cat: "function" },
-            "a": { x: 0.02, y: 0, z: 0.1, cat: "function" },
-            "by": { x: -0.05, y: 0, z: 0.15, cat: "function" },
-            "was": { x: 0.03, y: -0.05, z: 0.1, cat: "function" },
-            "my": { x: 0.08, y: 0.1, z: 0.2, cat: "function" },
-            "last": { x: 0.05, y: -0.08, z: 0.05, cat: "function" },
+            // Function words (center, neutral on all dimensions)
+            "the": { x: 0, y: 0, z: 0, cat: "function" },
+            "a": { x: 0.02, y: 0, z: 0.02, cat: "function" },
+            "by": { x: 0.1, y: 0, z: -0.05, cat: "function" },
+            "was": { x: 0, y: -0.05, z: 0.03, cat: "function" },
+            "my": { x: 0, y: 0.1, z: 0.15, cat: "function" },
+            "last": { x: 0, y: -0.08, z: 0.05, cat: "function" },
 
-            // Nature words (left, neutral-positive, concrete)
-            "river": { x: -0.7, y: 0.15, z: -0.3, cat: "nature" },
-            "bank": { x: -0.08, y: 0, z: -0.1, cat: "neutral" },
-            "steep": { x: -0.65, y: -0.1, z: -0.35, cat: "nature" },
-            "water": { x: -0.72, y: 0.2, z: -0.25, cat: "nature" },
-            "stream": { x: -0.68, y: 0.18, z: -0.28, cat: "nature" },
-            "shore": { x: -0.6, y: 0.1, z: -0.32, cat: "nature" },
-            "fish": { x: -0.75, y: 0.25, z: -0.2, cat: "nature" },
+            // Nature words (high X/nature, low Z/institution)
+            "river": { x: 0.7, y: 0.15, z: -0.65, cat: "nature" },
+            "bank": { x: 0, y: 0, z: 0, cat: "neutral" },
+            "steep": { x: 0.65, y: -0.1, z: -0.7, cat: "nature" },
+            "water": { x: 0.72, y: 0.2, z: -0.6, cat: "nature" },
+            "stream": { x: 0.68, y: 0.18, z: -0.62, cat: "nature" },
+            "shore": { x: 0.6, y: 0.1, z: -0.58, cat: "nature" },
+            "fish": { x: 0.75, y: 0.25, z: -0.55, cat: "nature" },
 
-            // Finance words (right, positive, more abstract)
-            "approved": { x: 0.65, y: 0.45, z: 0.25, cat: "finance" },
-            "loan": { x: 0.7, y: 0.35, z: 0.2, cat: "finance" },
-            "money": { x: 0.6, y: 0.3, z: 0.15, cat: "finance" },
-            "account": { x: 0.72, y: 0.4, z: 0.3, cat: "finance" },
-            "deposit": { x: 0.68, y: 0.32, z: 0.18, cat: "finance" },
-            "savings": { x: 0.58, y: 0.48, z: 0.28, cat: "finance" },
-            "today": { x: 0.15, y: 0.2, z: 0.05, cat: "function" },
+            // Finance words (low X/nature, high Z/institution, positive Y)
+            "approved": { x: -0.5, y: 0.45, z: 0.7, cat: "finance" },
+            "loan": { x: -0.45, y: 0.35, z: 0.72, cat: "finance" },
+            "money": { x: -0.4, y: 0.3, z: 0.65, cat: "finance" },
+            "account": { x: -0.48, y: 0.4, z: 0.75, cat: "finance" },
+            "deposit": { x: -0.42, y: 0.32, z: 0.68, cat: "finance" },
+            "savings": { x: -0.38, y: 0.48, z: 0.62, cat: "finance" },
+            "today": { x: 0.05, y: 0.2, z: 0.15, cat: "function" },
 
-            // Crime words (right, negative, concrete)
-            "robbed": { x: 0.7, y: -0.4, z: -0.2, cat: "crime" },
-            "police": { x: 0.65, y: -0.35, z: -0.15, cat: "crime" },
-            "alarm": { x: 0.6, y: -0.3, z: -0.25, cat: "crime" },
-            "theft": { x: 0.72, y: -0.45, z: -0.18, cat: "crime" },
-            "criminal": { x: 0.68, y: -0.38, z: -0.1, cat: "crime" },
-            "night": { x: 0.1, y: -0.2, z: -0.3, cat: "function" },
+            // Crime words (low X/nature, high Z/institution, negative Y)
+            "robbed": { x: -0.5, y: -0.4, z: 0.7, cat: "crime" },
+            "police": { x: -0.45, y: -0.35, z: 0.65, cat: "crime" },
+            "alarm": { x: -0.4, y: -0.3, z: 0.6, cat: "crime" },
+            "theft": { x: -0.52, y: -0.45, z: 0.72, cat: "crime" },
+            "criminal": { x: -0.48, y: -0.38, z: 0.68, cat: "crime" },
+            "night": { x: 0.1, y: -0.2, z: 0.1, cat: "function" },
         };
 
         // Sentences with 3D context positions
+        // X: Nature (low to high), Y: Sentiment (neg to pos), Z: Institution (low to high)
         const SENTENCES = {
             nature: {
                 tokens: ["The", "bank", "by", "the", "river", "was", "steep"],
                 positions: [
-                    { x: 0, y: 0, z: 0.1 },
-                    { x: -0.04, y: 0, z: 0 },
-                    { x: -0.12, y: 0.02, z: 0.05 },
-                    { x: -0.18, y: 0.03, z: 0.02 },
-                    { x: -0.55, y: 0.12, z: -0.22 },
-                    { x: -0.6, y: 0.05, z: -0.25 },
-                    { x: -0.65, y: -0.05, z: -0.32 },
+                    { x: 0, y: 0, z: 0 },           // "The" - neutral
+                    { x: 0, y: 0, z: 0 },           // "bank" - still ambiguous
+                    { x: 0.1, y: 0, z: -0.05 },     // "by" - slight nature pull
+                    { x: 0.15, y: 0.02, z: -0.1 },  // "the" - continuing
+                    { x: 0.55, y: 0.12, z: -0.5 },  // "river" - strong nature, low institution
+                    { x: 0.6, y: 0.05, z: -0.55 },  // "was" - in nature region
+                    { x: 0.65, y: -0.05, z: -0.6 }, // "steep" - nature region, slightly negative
                 ],
                 predictions: [
                     [["bank", 0.15], ["dog", 0.08], ["man", 0.07], ["river", 0.05], ["car", 0.04]],
@@ -813,12 +812,12 @@
             finance: {
                 tokens: ["The", "bank", "approved", "my", "loan", "today"],
                 positions: [
-                    { x: 0, y: 0, z: 0.1 },
-                    { x: -0.04, y: 0, z: 0 },
-                    { x: 0.45, y: 0.35, z: 0.18 },
-                    { x: 0.52, y: 0.38, z: 0.2 },
-                    { x: 0.62, y: 0.36, z: 0.2 },
-                    { x: 0.65, y: 0.4, z: 0.22 },
+                    { x: 0, y: 0, z: 0 },           // "The" - neutral
+                    { x: 0, y: 0, z: 0 },           // "bank" - still ambiguous
+                    { x: -0.4, y: 0.35, z: 0.55 },  // "approved" - institution, positive
+                    { x: -0.42, y: 0.38, z: 0.6 },  // "my" - staying in finance region
+                    { x: -0.45, y: 0.36, z: 0.65 }, // "loan" - strong institution
+                    { x: -0.45, y: 0.4, z: 0.68 },  // "today" - still in finance/positive
                 ],
                 predictions: [
                     [["bank", 0.15], ["dog", 0.08], ["man", 0.07], ["river", 0.05], ["car", 0.04]],
@@ -832,12 +831,12 @@
             crime: {
                 tokens: ["The", "bank", "was", "robbed", "last", "night"],
                 positions: [
-                    { x: 0, y: 0, z: 0.1 },
-                    { x: -0.04, y: 0, z: 0 },
-                    { x: 0, y: -0.04, z: 0.02 },
-                    { x: 0.5, y: -0.32, z: -0.15 },
-                    { x: 0.55, y: -0.35, z: -0.18 },
-                    { x: 0.6, y: -0.38, z: -0.25 },
+                    { x: 0, y: 0, z: 0 },           // "The" - neutral
+                    { x: 0, y: 0, z: 0 },           // "bank" - still ambiguous
+                    { x: 0, y: -0.04, z: 0.05 },    // "was" - slight negative, slight institution
+                    { x: -0.4, y: -0.32, z: 0.55 }, // "robbed" - institution, negative
+                    { x: -0.42, y: -0.35, z: 0.6 }, // "last" - staying in crime region
+                    { x: -0.45, y: -0.38, z: 0.65 },// "night" - institution, negative
                 ],
                 predictions: [
                     [["bank", 0.15], ["dog", 0.08], ["man", 0.07], ["river", 0.05], ["car", 0.04]],
@@ -969,29 +968,33 @@
             }
 
             updateDimensionBars(pos) {
-                // X dimension
-                const xBar = document.getElementById('dim-x');
-                const xVal = document.getElementById('dim-x-val');
-                const xPct = Math.abs(pos.x) * 60;
-                xBar.className = `dimension-bar ${pos.x >= 0 ? 'positive' : 'negative'}`;
-                xBar.style.width = `${xPct}%`;
-                xVal.textContent = pos.x.toFixed(2);
+                // Nature dimension (X) - 0 to 1 scale, left-aligned bar
+                const natureBar = document.getElementById('dim-nature');
+                const natureVal = document.getElementById('dim-nature-val');
+                // Convert from -1..1 to 0..1 for display, clamped
+                const naturePct = Math.max(0, Math.min(100, (pos.x + 0.1) * 70));
+                natureBar.className = 'dimension-bar positive';
+                natureBar.style.left = '0';
+                natureBar.style.width = `${naturePct}%`;
+                natureVal.textContent = Math.max(0, pos.x).toFixed(2);
 
-                // Y dimension
-                const yBar = document.getElementById('dim-y');
-                const yVal = document.getElementById('dim-y-val');
-                const yPct = Math.abs(pos.y) * 80;
-                yBar.className = `dimension-bar ${pos.y >= 0 ? 'positive' : 'negative'}`;
-                yBar.style.width = `${yPct}%`;
-                yVal.textContent = pos.y.toFixed(2);
+                // Institution dimension (Z) - 0 to 1 scale, left-aligned bar
+                const instBar = document.getElementById('dim-institution');
+                const instVal = document.getElementById('dim-institution-val');
+                // Convert from -1..1 to 0..1 for display, clamped
+                const instPct = Math.max(0, Math.min(100, (pos.z + 0.1) * 70));
+                instBar.className = 'dimension-bar positive';
+                instBar.style.left = '0';
+                instBar.style.width = `${instPct}%`;
+                instVal.textContent = Math.max(0, pos.z).toFixed(2);
 
-                // Z dimension
-                const zBar = document.getElementById('dim-z');
-                const zVal = document.getElementById('dim-z-val');
-                const zPct = Math.abs(pos.z) * 100;
-                zBar.className = `dimension-bar ${pos.z >= 0 ? 'positive' : 'negative'}`;
-                zBar.style.width = `${zPct}%`;
-                zVal.textContent = pos.z.toFixed(2);
+                // Sentiment dimension (Y) - centered bar, negative to positive
+                const sentBar = document.getElementById('dim-sentiment');
+                const sentVal = document.getElementById('dim-sentiment-val');
+                const sentPct = Math.abs(pos.y) * 80;
+                sentBar.className = `dimension-bar ${pos.y >= 0 ? 'positive' : 'negative'}`;
+                sentBar.style.width = `${sentPct}%`;
+                sentVal.textContent = pos.y.toFixed(2);
             }
 
             highlightNearbyWords() {
